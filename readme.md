@@ -2,6 +2,12 @@
 
 A dashboard widget for your WordPress site. Drop ideas for your future self to blog about.
 
+## Try it in WordPress Playground
+
+[**Open a live preview**](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/kellychoffman/ideas-dashboard-widget/main/blueprint.json) — boots a throwaway WordPress site in your browser with the plugin installed and activated. No local setup required.
+
+Every pull request also gets its own preview link posted as a sticky comment, so reviewers can try the proposed change with one click.
+
 ## What it does
 
 Adds a dashboard widget where you can jot down blog ideas as they hit you, without breaking flow to start a draft. Each idea is saved to your own user account — nobody else sees your list. When an idea is ready to become a post, one click converts it to a draft and opens the editor.

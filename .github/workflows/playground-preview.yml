@@ -1,0 +1,53 @@
+name: Playground preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Playground URL for this PR
+        id: url
+        env:
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          URL=$(node -e '
+            const blueprint = {
+              landingPage: "/wp-admin/index.php",
+              login: true,
+              steps: [
+                {
+                  step: "installPlugin",
+                  pluginData: {
+                    resource: "url",
+                    url: `https://github-proxy.com/proxy/?repo=${process.env.REPO}&pr=${process.env.PR}`
+                  },
+                  options: { activate: true }
+                }
+              ]
+            };
+            process.stdout.write(
+              "https://playground.wordpress.net/#" +
+              encodeURIComponent(JSON.stringify(blueprint))
+            );
+          ')
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Upsert preview comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: playground-preview
+          message: |
+            ### Preview this PR in WordPress Playground
+
+            **[Open live preview](${{ steps.url.outputs.url }})**
+
+            This launches a throwaway WordPress site in your browser with this PR's code installed and activated — no local setup required. The Ideas Inbox widget is on the dashboard you land on.
+
+            _This link updates automatically on every push to the PR._
