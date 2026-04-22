@@ -1,6 +1,6 @@
-# Ideas Dashboard Widget
+# Ideas Inbox
 
-An ideas inbox for your WordPress dashboard. Drop ideas for your future self to blog about.
+A dashboard widget for your WordPress site. Drop ideas for your future self to blog about.
 
 ## What it does
 

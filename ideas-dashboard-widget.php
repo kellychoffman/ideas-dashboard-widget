@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: Ideas Dashboard Widget
+ * Plugin Name: Ideas Inbox
  * Description: An ideas inbox for your WP dashboard. Drop ideas for your future self to blog about.
  * Version:     0.1.0
  * Author:      Kelly Hoffman
