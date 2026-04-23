@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ideas Inbox
  * Description: An ideas inbox for your WP dashboard. Drop ideas for your future self to blog about.
- * Version:     0.2.0
+ * Version:     0.3.0
  * Author:      Kelly Hoffman
  * License:     GPL-2.0-or-later
  * Text Domain: ideas-dashboard-widget
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const IDEAS_INBOX_VERSION   = '0.2.0';
+const IDEAS_INBOX_VERSION   = '0.3.0';
 const IDEAS_INBOX_META_KEY  = 'ideas_inbox';
 const IDEAS_INBOX_NONCE     = 'ideas_inbox';
 const IDEAS_INBOX_PAGE_SLUG = 'ideas-inbox';
@@ -33,12 +33,21 @@ function ideas_inbox_enqueue_assets( $hook ) {
 		return;
 	}
 	wp_enqueue_style( 'dashicons' );
+	wp_enqueue_style( 'wp-components' );
 	wp_enqueue_style(
 		'ideas-inbox',
 		plugins_url( 'assets/ideas-inbox.css', __FILE__ ),
-		array( 'dashicons' ),
+		array( 'dashicons', 'wp-components' ),
 		IDEAS_INBOX_VERSION
 	);
+	wp_enqueue_script(
+		'ideas-inbox',
+		plugins_url( 'assets/ideas-inbox.js', __FILE__ ),
+		array( 'wp-components', 'wp-element', 'wp-i18n' ),
+		IDEAS_INBOX_VERSION,
+		true
+	);
+	wp_set_script_translations( 'ideas-inbox', 'ideas-dashboard-widget' );
 }
 
 function ideas_inbox_register_widget() {
