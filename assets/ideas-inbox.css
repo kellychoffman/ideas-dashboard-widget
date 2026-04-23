@@ -109,6 +109,11 @@
 	gap: var( --wpds-dimension-gap-xs, 4px );
 }
 
+.ideas-inbox__row-actions .button-small:hover,
+.ideas-inbox__row-actions .button-small:focus {
+	background: transparent;
+}
+
 .ideas-inbox__view-all {
 	margin: var( --wpds-dimension-gap-sm, 8px ) 0 0;
 	text-align: right;
