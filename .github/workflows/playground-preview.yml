@@ -14,7 +14,7 @@ jobs:
       - name: Build Playground URL for this PR
         id: url
         env:
-          REPO: ${{ github.repository }}
+          REPO: ${{ github.event.pull_request.head.repo.full_name }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           URL=$(node -e '
