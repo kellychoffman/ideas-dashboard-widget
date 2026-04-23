@@ -16,11 +16,29 @@ const IDEAS_INBOX_META_KEY  = 'ideas_inbox';
 const IDEAS_INBOX_NONCE     = 'ideas_inbox';
 const IDEAS_INBOX_PAGE_SLUG = 'ideas-inbox';
 
-add_action( 'wp_dashboard_setup', 'ideas_inbox_register_widget' );
-add_action( 'admin_menu',         'ideas_inbox_register_page' );
+add_action( 'wp_dashboard_setup',    'ideas_inbox_register_widget' );
+add_action( 'admin_menu',            'ideas_inbox_register_page' );
+add_action( 'admin_enqueue_scripts', 'ideas_inbox_enqueue_assets' );
 add_action( 'admin_post_ideas_inbox_add',    'ideas_inbox_handle_add' );
 add_action( 'admin_post_ideas_inbox_delete', 'ideas_inbox_handle_delete' );
 add_action( 'admin_post_ideas_inbox_draft',  'ideas_inbox_handle_draft' );
+
+function ideas_inbox_enqueue_assets( $hook ) {
+	$ideas_inbox_page_hook = 'posts_page_' . IDEAS_INBOX_PAGE_SLUG;
+	if ( 'index.php' !== $hook && $ideas_inbox_page_hook !== $hook ) {
+		return;
+	}
+	if ( ! current_user_can( 'edit_posts' ) ) {
+		return;
+	}
+	wp_enqueue_style( 'dashicons' );
+	wp_enqueue_style(
+		'ideas-inbox',
+		plugins_url( 'assets/ideas-inbox.css', __FILE__ ),
+		array( 'dashicons' ),
+		'0.2.0'
+	);
+}
 
 function ideas_inbox_register_widget() {
 	if ( ! current_user_can( 'edit_posts' ) ) {
@@ -58,38 +76,65 @@ function ideas_inbox_render_widget() {
 	$total   = count( $ideas );
 	$visible = array_slice( $ideas, -5, 5, true );
 	?>
-	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-bottom:1em;">
-		<input type="hidden" name="action" value="ideas_inbox_add" />
-		<?php wp_nonce_field( IDEAS_INBOX_NONCE ); ?>
-		<textarea
-			name="idea"
-			rows="2"
-			style="width:100%;"
-			placeholder="<?php esc_attr_e( 'Drop an idea for future you…', 'ideas-dashboard-widget' ); ?>"
-			required
-		></textarea>
-		<p style="text-align:right;margin:.5em 0 0;">
-			<button type="submit" class="button button-primary">
-				<?php esc_html_e( 'Add idea', 'ideas-dashboard-widget' ); ?>
-			</button>
-		</p>
-	</form>
-
-	<?php if ( empty( $ideas ) ) : ?>
-		<p style="color:#666;"><em><?php esc_html_e( 'No ideas yet. Drop one above.', 'ideas-dashboard-widget' ); ?></em></p>
-	<?php else : ?>
-		<?php ideas_inbox_render_list( array_reverse( $visible, true ) ); ?>
-		<?php if ( $total > 5 ) : ?>
-			<p style="text-align:right;margin:.75em 0 0;">
-				<a href="<?php echo esc_url( add_query_arg( 'page', IDEAS_INBOX_PAGE_SLUG, admin_url( 'edit.php' ) ) ); ?>">
-					<?php
-					/* translators: %d: total number of ideas */
-					echo esc_html( sprintf( __( 'View all ideas (%d) →', 'ideas-dashboard-widget' ), $total ) );
-					?>
-				</a>
+	<div class="ideas-inbox">
+		<form class="ideas-inbox__form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<input type="hidden" name="action" value="ideas_inbox_add" />
+			<?php wp_nonce_field( IDEAS_INBOX_NONCE ); ?>
+			<label class="screen-reader-text" for="ideas-inbox-idea">
+				<?php esc_html_e( 'New idea', 'ideas-dashboard-widget' ); ?>
+			</label>
+			<textarea
+				id="ideas-inbox-idea"
+				class="ideas-inbox__textarea"
+				name="idea"
+				rows="2"
+				placeholder="<?php esc_attr_e( 'Drop an idea for future you…', 'ideas-dashboard-widget' ); ?>"
+				required
+			></textarea>
+			<p class="ideas-inbox__form-actions">
+				<button type="submit" class="button button-primary">
+					<?php esc_html_e( 'Add idea', 'ideas-dashboard-widget' ); ?>
+				</button>
 			</p>
+		</form>
+
+		<?php if ( 0 === $total ) : ?>
+			<div class="ideas-inbox__empty">
+				<span class="dashicons dashicons-lightbulb" aria-hidden="true"></span>
+				<p class="ideas-inbox__empty-title">
+					<?php esc_html_e( 'No ideas yet', 'ideas-dashboard-widget' ); ?>
+				</p>
+				<p class="ideas-inbox__empty-hint">
+					<?php esc_html_e( 'Drop one above to save it for later.', 'ideas-dashboard-widget' ); ?>
+				</p>
+			</div>
+		<?php else : ?>
+			<div class="ideas-inbox__header">
+				<span class="ideas-inbox__count">
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: %s: number of saved ideas */
+							_n( '%s idea', '%s ideas', $total, 'ideas-dashboard-widget' ),
+							number_format_i18n( $total )
+						)
+					);
+					?>
+				</span>
+			</div>
+			<?php ideas_inbox_render_list( array_reverse( $visible, true ) ); ?>
+			<?php if ( $total > 5 ) : ?>
+				<p class="ideas-inbox__view-all">
+					<a href="<?php echo esc_url( add_query_arg( 'page', IDEAS_INBOX_PAGE_SLUG, admin_url( 'edit.php' ) ) ); ?>">
+						<?php
+						/* translators: %d: total number of ideas */
+						echo esc_html( sprintf( __( 'View all ideas (%d) →', 'ideas-dashboard-widget' ), $total ) );
+						?>
+					</a>
+				</p>
+			<?php endif; ?>
 		<?php endif; ?>
-	<?php endif; ?>
+	</div>
 	<?php
 }
 
@@ -108,15 +153,23 @@ function ideas_inbox_render_page() {
 	$newest_first = array_reverse( $ideas, true );
 	$page_slice   = array_slice( $newest_first, $offset, $per_page, true );
 	?>
-	<div class="wrap">
+	<div class="wrap ideas-inbox">
 		<h1><?php esc_html_e( 'Ideas Inbox', 'ideas-dashboard-widget' ); ?></h1>
 
 		<?php if ( empty( $ideas ) ) : ?>
-			<p><em><?php esc_html_e( 'No ideas yet. Head to your dashboard to add one.', 'ideas-dashboard-widget' ); ?></em></p>
+			<div class="ideas-inbox__empty">
+				<span class="dashicons dashicons-lightbulb" aria-hidden="true"></span>
+				<p class="ideas-inbox__empty-title">
+					<?php esc_html_e( 'No ideas yet', 'ideas-dashboard-widget' ); ?>
+				</p>
+				<p class="ideas-inbox__empty-hint">
+					<?php esc_html_e( 'Head to your dashboard to add one.', 'ideas-dashboard-widget' ); ?>
+				</p>
+			</div>
 		<?php else : ?>
 			<?php ideas_inbox_render_list( $page_slice ); ?>
 			<?php if ( $total_pages > 1 ) : ?>
-				<div class="tablenav" style="margin-top:1em;">
+				<div class="tablenav">
 					<div class="tablenav-pages">
 						<?php
 						echo paginate_links(
@@ -146,23 +199,33 @@ function ideas_inbox_render_page() {
 
 function ideas_inbox_render_list( array $ideas ) {
 	?>
-	<ul style="margin:0;padding:0;list-style:none;">
+	<ul class="ideas-inbox__list">
 		<?php foreach ( $ideas as $index => $idea ) : ?>
-			<li style="padding:.6em 0;border-top:1px solid #eee;">
-				<div style="white-space:pre-wrap;"><?php echo esc_html( $idea['text'] ); ?></div>
-				<div style="font-size:.85em;color:#666;margin-top:.25em;">
-					<?php
-					/* translators: %s: human-readable time difference, e.g. "3 hours" */
-					echo esc_html( sprintf( __( '%s ago', 'ideas-dashboard-widget' ), human_time_diff( (int) $idea['time'] ) ) );
-					?>
-					&nbsp;·&nbsp;
-					<a href="<?php echo esc_url( ideas_inbox_action_url( 'ideas_inbox_draft', $index ) ); ?>">
-						<?php esc_html_e( 'Turn into draft', 'ideas-dashboard-widget' ); ?>
-					</a>
-					&nbsp;·&nbsp;
-					<a href="<?php echo esc_url( ideas_inbox_action_url( 'ideas_inbox_delete', $index ) ); ?>" style="color:#b32d2e;">
-						<?php esc_html_e( 'Delete', 'ideas-dashboard-widget' ); ?>
-					</a>
+			<li class="ideas-inbox__row">
+				<div class="ideas-inbox__row-text"><?php echo esc_html( $idea['text'] ); ?></div>
+				<div class="ideas-inbox__row-meta">
+					<span class="ideas-inbox__row-time">
+						<?php
+						/* translators: %s: human-readable time difference, e.g. "3 hours" */
+						echo esc_html( sprintf( __( '%s ago', 'ideas-dashboard-widget' ), human_time_diff( (int) $idea['time'] ) ) );
+						?>
+					</span>
+					<span class="ideas-inbox__row-actions">
+						<a
+							class="button button-small"
+							href="<?php echo esc_url( ideas_inbox_action_url( 'ideas_inbox_draft', $index ) ); ?>"
+						>
+							<?php esc_html_e( 'Turn into draft', 'ideas-dashboard-widget' ); ?>
+						</a>
+						<a
+							class="ideas-inbox__delete"
+							href="<?php echo esc_url( ideas_inbox_action_url( 'ideas_inbox_delete', $index ) ); ?>"
+							aria-label="<?php esc_attr_e( 'Delete idea', 'ideas-dashboard-widget' ); ?>"
+							onclick="return confirm( <?php echo wp_json_encode( __( 'Delete this idea?', 'ideas-dashboard-widget' ) ); ?> );"
+						>
+							<span class="dashicons dashicons-trash" aria-hidden="true"></span>
+						</a>
+					</span>
 				</div>
 			</li>
 		<?php endforeach; ?>
