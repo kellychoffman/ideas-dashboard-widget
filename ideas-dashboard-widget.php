@@ -159,7 +159,7 @@ function ideas_inbox_handle_draft() {
 	$post_id = wp_insert_post(
 		array(
 			'post_title'   => wp_trim_words( $idea['text'], 10, '…' ),
-			'post_content' => $idea['text'],
+			'post_content' => "<!-- wp:paragraph -->\n<p>" . str_replace( "\n", '<br>', esc_html( $idea['text'] ) ) . "</p>\n<!-- /wp:paragraph -->",
 			'post_status'  => 'draft',
 			'post_author'  => get_current_user_id(),
 		),
