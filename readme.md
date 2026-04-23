@@ -36,7 +36,8 @@ This plugin is deliberately small:
 ## Usage
 
 - Type an idea into the textarea and click **Add idea**.
-- Existing ideas appear below in reverse-chronological order.
+- The widget shows your 5 most recent ideas in reverse-chronological order. When you have more than 5, a **View all ideas** link appears at the bottom of the widget.
+- All ideas also live on a dedicated admin screen at **Posts → Ideas Inbox**, paginated 20 at a time.
 - Each idea has two actions:
   - **Turn into draft** — creates a draft post with the idea as the content (and a trimmed title), removes it from the inbox, and opens the post editor.
   - **Delete** — removes the idea from the inbox.
