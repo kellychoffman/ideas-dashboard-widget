@@ -170,7 +170,7 @@ function ideas_inbox_render_page() {
 		<?php else : ?>
 			<?php ideas_inbox_render_list( $page_slice ); ?>
 			<?php if ( $total_pages > 1 ) : ?>
-				<div class="tablenav">
+				<div class="tablenav ideas-inbox__pagination">
 					<div class="tablenav-pages">
 						<?php
 						echo paginate_links(
