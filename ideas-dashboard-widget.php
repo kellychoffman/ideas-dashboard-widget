@@ -12,6 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+const IDEAS_INBOX_VERSION   = '0.2.0';
 const IDEAS_INBOX_META_KEY  = 'ideas_inbox';
 const IDEAS_INBOX_NONCE     = 'ideas_inbox';
 const IDEAS_INBOX_PAGE_SLUG = 'ideas-inbox';
@@ -36,7 +37,7 @@ function ideas_inbox_enqueue_assets( $hook ) {
 		'ideas-inbox',
 		plugins_url( 'assets/ideas-inbox.css', __FILE__ ),
 		array( 'dashicons' ),
-		'0.2.0'
+		IDEAS_INBOX_VERSION
 	);
 }
 
