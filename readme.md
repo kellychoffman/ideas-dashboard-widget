@@ -42,6 +42,13 @@ This plugin is deliberately small:
   - **Turn into draft** — creates a draft post with the idea as the content (and a trimmed title), removes it from the inbox, and opens the post editor.
   - **Delete** — removes the idea from the inbox.
 
+## Changelog
+
+### 0.4.0
+
+- Add and delete ideas without a full page reload. Uses a `ideas-inbox/v1` REST namespace with `wp.apiFetch`; the existing `admin-post.php` handlers stay as the no-JS fallback.
+- Each idea now carries a stable UUID. Existing ideas get IDs assigned lazily on first read.
+
 ## License
 
 GPL-2.0-or-later

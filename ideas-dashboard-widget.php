@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ideas Inbox
  * Description: An ideas inbox for your WP dashboard. Drop ideas for your future self to blog about.
- * Version:     0.3.0
+ * Version:     0.4.0
  * Author:      Kelly Hoffman
  * License:     GPL-2.0-or-later
  * Text Domain: ideas-dashboard-widget
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const IDEAS_INBOX_VERSION   = '0.3.0';
+const IDEAS_INBOX_VERSION   = '0.4.0';
 const IDEAS_INBOX_META_KEY  = 'ideas_inbox';
 const IDEAS_INBOX_NONCE     = 'ideas_inbox';
 const IDEAS_INBOX_PAGE_SLUG = 'ideas-inbox';
@@ -23,6 +23,7 @@ add_action( 'admin_enqueue_scripts', 'ideas_inbox_enqueue_assets' );
 add_action( 'admin_post_ideas_inbox_add',    'ideas_inbox_handle_add' );
 add_action( 'admin_post_ideas_inbox_delete', 'ideas_inbox_handle_delete' );
 add_action( 'admin_post_ideas_inbox_draft',  'ideas_inbox_handle_draft' );
+add_action( 'rest_api_init',                 'ideas_inbox_register_rest_routes' );
 
 function ideas_inbox_enqueue_assets( $hook ) {
 	$ideas_inbox_page_hook = 'posts_page_' . IDEAS_INBOX_PAGE_SLUG;
@@ -43,9 +44,18 @@ function ideas_inbox_enqueue_assets( $hook ) {
 	wp_enqueue_script(
 		'ideas-inbox',
 		plugins_url( 'assets/ideas-inbox.js', __FILE__ ),
-		array( 'wp-components', 'wp-element', 'wp-i18n' ),
+		array( 'wp-api-fetch', 'wp-components', 'wp-element', 'wp-i18n' ),
 		IDEAS_INBOX_VERSION,
 		true
+	);
+	wp_add_inline_script(
+		'ideas-inbox',
+		'window.IdeasInbox = ' . wp_json_encode(
+			array(
+				'viewAllUrl' => add_query_arg( 'page', IDEAS_INBOX_PAGE_SLUG, admin_url( 'edit.php' ) ),
+			)
+		) . ';',
+		'before'
 	);
 	wp_set_script_translations( 'ideas-inbox', 'ideas-dashboard-widget' );
 }
@@ -74,11 +84,34 @@ function ideas_inbox_register_page() {
 
 function ideas_inbox_get_ideas() {
 	$ideas = get_user_meta( get_current_user_id(), IDEAS_INBOX_META_KEY, true );
-	return is_array( $ideas ) ? $ideas : array();
+	if ( ! is_array( $ideas ) ) {
+		return array();
+	}
+
+	$dirty = false;
+	foreach ( $ideas as $k => $idea ) {
+		if ( empty( $idea['id'] ) ) {
+			$ideas[ $k ]['id'] = wp_generate_uuid4();
+			$dirty = true;
+		}
+	}
+	if ( $dirty ) {
+		ideas_inbox_save_ideas( $ideas );
+	}
+	return $ideas;
 }
 
 function ideas_inbox_save_ideas( array $ideas ) {
 	update_user_meta( get_current_user_id(), IDEAS_INBOX_META_KEY, array_values( $ideas ) );
+}
+
+function ideas_inbox_find_index_by_id( array $ideas, $id ) {
+	foreach ( $ideas as $k => $idea ) {
+		if ( isset( $idea['id'] ) && hash_equals( $idea['id'], (string) $id ) ) {
+			return $k;
+		}
+	}
+	return false;
 }
 
 function ideas_inbox_render_widget() {
@@ -211,35 +244,44 @@ function ideas_inbox_render_list( array $ideas ) {
 	?>
 	<ul class="ideas-inbox__list">
 		<?php foreach ( $ideas as $index => $idea ) : ?>
-			<li class="ideas-inbox__row">
-				<div class="ideas-inbox__row-text"><?php echo esc_html( $idea['text'] ); ?></div>
-				<div class="ideas-inbox__row-meta">
-					<span class="ideas-inbox__row-time">
-						<?php
-						/* translators: %s: human-readable time difference, e.g. "3 hours" */
-						echo esc_html( sprintf( __( '%s ago', 'ideas-dashboard-widget' ), human_time_diff( (int) $idea['time'] ) ) );
-						?>
-					</span>
-					<span class="ideas-inbox__row-actions">
-						<a
-							class="button button-small"
-							href="<?php echo esc_url( ideas_inbox_action_url( 'ideas_inbox_draft', $index ) ); ?>"
-						>
-							<?php esc_html_e( 'Turn into draft', 'ideas-dashboard-widget' ); ?>
-						</a>
-						<a
-							class="ideas-inbox__delete"
-							href="<?php echo esc_url( ideas_inbox_action_url( 'ideas_inbox_delete', $index ) ); ?>"
-							aria-label="<?php esc_attr_e( 'Delete idea', 'ideas-dashboard-widget' ); ?>"
-							onclick="return confirm( <?php echo wp_json_encode( __( 'Delete this idea?', 'ideas-dashboard-widget' ) ); ?> );"
-						>
-							<span class="dashicons dashicons-trash" aria-hidden="true"></span>
-						</a>
-					</span>
-				</div>
-			</li>
+			<?php ideas_inbox_render_row( $idea, $index ); ?>
 		<?php endforeach; ?>
 	</ul>
+	<?php
+}
+
+function ideas_inbox_render_row( array $idea, $index = 0, $include_confirm_fallback = true ) {
+	$id = isset( $idea['id'] ) ? $idea['id'] : '';
+	?>
+	<li class="ideas-inbox__row" data-id="<?php echo esc_attr( $id ); ?>">
+		<div class="ideas-inbox__row-text"><?php echo esc_html( $idea['text'] ); ?></div>
+		<div class="ideas-inbox__row-meta">
+			<span class="ideas-inbox__row-time">
+				<?php
+				/* translators: %s: human-readable time difference, e.g. "3 hours" */
+				echo esc_html( sprintf( __( '%s ago', 'ideas-dashboard-widget' ), human_time_diff( (int) $idea['time'] ) ) );
+				?>
+			</span>
+			<span class="ideas-inbox__row-actions">
+				<a
+					class="button button-small"
+					href="<?php echo esc_url( ideas_inbox_action_url( 'ideas_inbox_draft', $index ) ); ?>"
+				>
+					<?php esc_html_e( 'Turn into draft', 'ideas-dashboard-widget' ); ?>
+				</a>
+				<a
+					class="ideas-inbox__delete"
+					href="<?php echo esc_url( ideas_inbox_action_url( 'ideas_inbox_delete', $index ) ); ?>"
+					aria-label="<?php esc_attr_e( 'Delete idea', 'ideas-dashboard-widget' ); ?>"
+					<?php if ( $include_confirm_fallback ) : ?>
+					onclick="return confirm( <?php echo wp_json_encode( __( 'Delete this idea?', 'ideas-dashboard-widget' ) ); ?> );"
+					<?php endif; ?>
+				>
+					<span class="dashicons dashicons-trash" aria-hidden="true"></span>
+				</a>
+			</span>
+		</div>
+	</li>
 	<?php
 }
 
@@ -278,6 +320,7 @@ function ideas_inbox_handle_add() {
 	if ( '' !== trim( $text ) ) {
 		$ideas   = ideas_inbox_get_ideas();
 		$ideas[] = array(
+			'id'   => wp_generate_uuid4(),
 			'text' => $text,
 			'time' => time(),
 		);
@@ -285,6 +328,114 @@ function ideas_inbox_handle_add() {
 	}
 
 	ideas_inbox_redirect_back();
+}
+
+function ideas_inbox_register_rest_routes() {
+	$permission = static function () {
+		return current_user_can( 'edit_posts' );
+	};
+
+	register_rest_route(
+		'ideas-inbox/v1',
+		'/ideas',
+		array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => 'ideas_inbox_rest_add',
+			'permission_callback' => $permission,
+			'args'                => array(
+				'text' => array(
+					'required'          => true,
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_textarea_field',
+				),
+			),
+		)
+	);
+
+	register_rest_route(
+		'ideas-inbox/v1',
+		'/ideas/(?P<id>[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})',
+		array(
+			'methods'             => WP_REST_Server::DELETABLE,
+			'callback'            => 'ideas_inbox_rest_delete',
+			'permission_callback' => $permission,
+		)
+	);
+}
+
+function ideas_inbox_rest_add( WP_REST_Request $request ) {
+	// $request['text'] is already sanitized + trimmed by sanitize_textarea_field.
+	$text = (string) $request['text'];
+	if ( '' === $text ) {
+		return new WP_Error(
+			'ideas_inbox_empty',
+			__( 'Idea cannot be empty.', 'ideas-dashboard-widget' ),
+			array( 'status' => 400 )
+		);
+	}
+
+	$ideas = ideas_inbox_get_ideas();
+	$idea  = array(
+		'id'   => wp_generate_uuid4(),
+		'text' => $text,
+		'time' => time(),
+	);
+	$ideas[] = $idea;
+	ideas_inbox_save_ideas( $ideas );
+
+	// $index is passed to render_row so the rendered row's no-JS
+	// delete/draft hrefs point at the correct positional admin-post URLs.
+	$index = count( $ideas ) - 1;
+
+	ob_start();
+	ideas_inbox_render_row( $idea, $index, false );
+	$html = ob_get_clean();
+
+	return rest_ensure_response(
+		array(
+			'id'    => $idea['id'],
+			'html'  => $html,
+			'total' => count( $ideas ),
+		)
+	);
+}
+
+function ideas_inbox_rest_delete( WP_REST_Request $request ) {
+	$ideas = ideas_inbox_get_ideas();
+	$index = ideas_inbox_find_index_by_id( $ideas, $request['id'] );
+
+	if ( false === $index ) {
+		return new WP_Error(
+			'ideas_inbox_not_found',
+			__( 'Idea not found.', 'ideas-dashboard-widget' ),
+			array( 'status' => 404 )
+		);
+	}
+
+	unset( $ideas[ $index ] );
+	$ideas = array_values( $ideas );
+	ideas_inbox_save_ideas( $ideas );
+
+	$total     = count( $ideas );
+	$fill_html = null;
+
+	// Widget shows the 5 most recent. When total is still ≥ 5, the idea
+	// that should now be the bottom visible row sits at index total - 5
+	// of the oldest-first array. Client decides whether to use this.
+	if ( $total >= 5 ) {
+		$fill_index = $total - 5;
+		$fill_idea  = $ideas[ $fill_index ];
+		ob_start();
+		ideas_inbox_render_row( $fill_idea, $fill_index, false );
+		$fill_html = ob_get_clean();
+	}
+
+	return rest_ensure_response(
+		array(
+			'total'     => $total,
+			'fill_html' => $fill_html,
+		)
+	);
 }
 
 function ideas_inbox_handle_delete() {
