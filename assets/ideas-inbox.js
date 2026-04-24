@@ -15,11 +15,10 @@
 ( function () {
 	'use strict';
 
-	if ( typeof wp === 'undefined' || ! wp.components || ! wp.element || ! wp.i18n ) {
+	if ( typeof wp === 'undefined' || ! wp.element || ! wp.i18n ) {
 		return;
 	}
 
-	var ConfirmDialog = wp.components.__experimentalConfirmDialog;
 	var createElement = wp.element.createElement;
 	var createRoot    = wp.element.createRoot;
 	var useState      = wp.element.useState;
@@ -29,9 +28,11 @@
 	var _n            = wp.i18n._n;
 	var apiFetch      = wp.apiFetch;
 
-	if ( ! ConfirmDialog || ! createRoot ) {
-		return;
-	}
+	// The delete dialog depends on Components; the add flow does not.
+	// Guard them independently so the add-form enhancement still
+	// activates even if __experimentalConfirmDialog is renamed or removed.
+	var ConfirmDialog   = wp.components && wp.components.__experimentalConfirmDialog;
+	var hasDeleteDialog = !! ( ConfirmDialog && createRoot );
 
 	var DIALOG_EVENT = 'ideas-inbox:confirm-delete';
 	var REST_BASE    = '/ideas-inbox/v1/ideas';
@@ -246,7 +247,7 @@
 		}
 
 		apiFetch( {
-			path: REST_BASE + '/' + encodeURIComponent( pending.id ),
+			path: REST_BASE + '/' + pending.id,
 			method: 'DELETE',
 		} ).then( function ( res ) {
 			onDeleteSuccess( container, pending.row, res );
@@ -340,34 +341,36 @@
 	}
 
 	function init() {
-		// Mount the dialog portal outside the dashboard widget so it
-		// isn't clipped by postbox overflow rules.
-		var dialogRoot = document.createElement( 'div' );
-		dialogRoot.className = 'ideas-inbox-dialog-root';
-		document.body.appendChild( dialogRoot );
-		createRoot( dialogRoot ).render( createElement( DeleteConfirm ) );
+		if ( hasDeleteDialog ) {
+			// Mount the dialog portal outside the dashboard widget so it
+			// isn't clipped by postbox overflow rules.
+			var dialogRoot = document.createElement( 'div' );
+			dialogRoot.className = 'ideas-inbox-dialog-root';
+			document.body.appendChild( dialogRoot );
+			createRoot( dialogRoot ).render( createElement( DeleteConfirm ) );
 
-		// Strip the native confirm() fallback now that the component
-		// dialog is ready. Links without JS keep the inline handler.
-		document.querySelectorAll( '.ideas-inbox__delete[onclick]' ).forEach( function ( link ) {
-			link.removeAttribute( 'onclick' );
-		} );
+			// Strip the native confirm() fallback now that the component
+			// dialog is ready. Links without JS keep the inline handler.
+			document.querySelectorAll( '.ideas-inbox__delete[onclick]' ).forEach( function ( link ) {
+				link.removeAttribute( 'onclick' );
+			} );
 
-		// Delegate delete click handling (also covers rows inserted later).
-		document.addEventListener( 'click', function ( event ) {
-			var link = event.target.closest( '.ideas-inbox__delete' );
-			if ( ! link ) {
-				return;
-			}
-			event.preventDefault();
-			var row = link.closest( '.ideas-inbox__row' );
-			var id  = row ? row.getAttribute( 'data-id' ) : '';
-			document.dispatchEvent(
-				new CustomEvent( DIALOG_EVENT, {
-					detail: { url: link.href, id: id, row: row },
-				} )
-			);
-		} );
+			// Delegate delete click handling (also covers rows inserted later).
+			document.addEventListener( 'click', function ( event ) {
+				var link = event.target.closest( '.ideas-inbox__delete' );
+				if ( ! link ) {
+					return;
+				}
+				event.preventDefault();
+				var row = link.closest( '.ideas-inbox__row' );
+				var id  = row ? row.getAttribute( 'data-id' ) : '';
+				document.dispatchEvent(
+					new CustomEvent( DIALOG_EVENT, {
+						detail: { url: link.href, id: id, row: row },
+					} )
+				);
+			} );
+		}
 
 		document.querySelectorAll( '.ideas-inbox' ).forEach( bindAddForm );
 	}

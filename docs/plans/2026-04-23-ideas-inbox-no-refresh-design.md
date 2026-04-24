@@ -14,7 +14,7 @@ Edit-in-place is planned as a follow-up; the design below introduces stable idea
 - **Endpoint style:** WP REST API, namespace `ideas-inbox/v1`.
 - **Identity:** each idea gets a stable UUID. Positional indexes stay as the no-JS fallback URL shape for existing `admin-post` handlers.
 - **DOM strategy:** PHP is the single source of truth for row markup. The add response returns a pre-rendered `<li>` fragment; JS does `insertAdjacentHTML`. JS duplicates only the empty state and list skeleton (a few lines each).
-- **Widget "fill-in" on delete:** accept a temporary 4-of-N display until next dashboard load. No server-side fill-in logic.
+- **Widget "fill-in" on delete:** *revised during implementation.* The delete response returns a pre-rendered `fill_html` for the next-oldest idea whenever `total >= 5` after the delete. The client appends it when the widget list has fewer than 5 visible rows, keeping the widget consistently full. The earlier "accept a temporary gap" decision was reversed once the gap turned out to be more visible than expected.
 - **Error surface:** inline `notice notice-error` div. No toast / snackbar.
 
 ## Data model
@@ -56,7 +56,8 @@ Namespace: `ideas-inbox/v1`. Auth: `current_user_can( 'edit_posts' )`. Nonce: `w
 ### `DELETE /ideas/{id}`
 
 - Looks up by UUID. Not found → 404.
-- Unsets, saves, returns `{total}`.
+- Unsets, saves, returns `{total, fill_html}`.
+- `fill_html` is the pre-rendered `<li>` for the idea at position `total - 5` in the oldest-first array when `total >= 5`, otherwise `null`. The widget uses it to backfill; the submenu page ignores it.
 
 ## Client JS flow
 

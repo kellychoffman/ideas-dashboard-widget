@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ideas Inbox
  * Description: An ideas inbox for your WP dashboard. Drop ideas for your future self to blog about.
- * Version:     0.3.0
+ * Version:     0.4.0
  * Author:      Kelly Hoffman
  * License:     GPL-2.0-or-later
  * Text Domain: ideas-dashboard-widget
@@ -250,7 +250,7 @@ function ideas_inbox_render_list( array $ideas ) {
 	<?php
 }
 
-function ideas_inbox_render_row( array $idea, $index = 0 ) {
+function ideas_inbox_render_row( array $idea, $index = 0, $include_confirm_fallback = true ) {
 	$id = isset( $idea['id'] ) ? $idea['id'] : '';
 	?>
 	<li class="ideas-inbox__row" data-id="<?php echo esc_attr( $id ); ?>">
@@ -273,7 +273,9 @@ function ideas_inbox_render_row( array $idea, $index = 0 ) {
 					class="ideas-inbox__delete"
 					href="<?php echo esc_url( ideas_inbox_action_url( 'ideas_inbox_delete', $index ) ); ?>"
 					aria-label="<?php esc_attr_e( 'Delete idea', 'ideas-dashboard-widget' ); ?>"
+					<?php if ( $include_confirm_fallback ) : ?>
 					onclick="return confirm( <?php echo wp_json_encode( __( 'Delete this idea?', 'ideas-dashboard-widget' ) ); ?> );"
+					<?php endif; ?>
 				>
 					<span class="dashicons dashicons-trash" aria-hidden="true"></span>
 				</a>
@@ -352,7 +354,7 @@ function ideas_inbox_register_rest_routes() {
 
 	register_rest_route(
 		'ideas-inbox/v1',
-		'/ideas/(?P<id>[a-f0-9\-]+)',
+		'/ideas/(?P<id>[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})',
 		array(
 			'methods'             => WP_REST_Server::DELETABLE,
 			'callback'            => 'ideas_inbox_rest_delete',
@@ -362,7 +364,8 @@ function ideas_inbox_register_rest_routes() {
 }
 
 function ideas_inbox_rest_add( WP_REST_Request $request ) {
-	$text = trim( (string) $request['text'] );
+	// $request['text'] is already sanitized + trimmed by sanitize_textarea_field.
+	$text = (string) $request['text'];
 	if ( '' === $text ) {
 		return new WP_Error(
 			'ideas_inbox_empty',
@@ -380,11 +383,12 @@ function ideas_inbox_rest_add( WP_REST_Request $request ) {
 	$ideas[] = $idea;
 	ideas_inbox_save_ideas( $ideas );
 
-	// The newly appended idea sits at the last index of the saved array.
+	// $index is passed to render_row so the rendered row's no-JS
+	// delete/draft hrefs point at the correct positional admin-post URLs.
 	$index = count( $ideas ) - 1;
 
 	ob_start();
-	ideas_inbox_render_row( $idea, $index );
+	ideas_inbox_render_row( $idea, $index, false );
 	$html = ob_get_clean();
 
 	return rest_ensure_response(
@@ -422,7 +426,7 @@ function ideas_inbox_rest_delete( WP_REST_Request $request ) {
 		$fill_index = $total - 5;
 		$fill_idea  = $ideas[ $fill_index ];
 		ob_start();
-		ideas_inbox_render_row( $fill_idea, $fill_index );
+		ideas_inbox_render_row( $fill_idea, $fill_index, false );
 		$fill_html = ob_get_clean();
 	}
 
