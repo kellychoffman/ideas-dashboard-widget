@@ -212,3 +212,13 @@
 	margin: 0;
 	font-size: var( --wpds-typography-font-size-xs, 12px );
 }
+
+/* Inline error notice shown when a REST call fails. */
+
+.ideas-inbox__notice {
+	margin: 0 0 var( --wpds-dimension-gap-md, 16px );
+}
+
+.ideas-inbox__notice p {
+	margin: 0.5em 0;
+}
