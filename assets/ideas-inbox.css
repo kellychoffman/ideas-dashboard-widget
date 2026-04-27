@@ -11,40 +11,55 @@
 	color: var( --wpds-color-fg-content-neutral, #1e1e1e );
 }
 
-/* Form surface */
+/* Writing surface — gray header band that extends edge-to-edge of the
+   postbox, separated from the white list section below by a hairline,
+   matching the standard core dashboard widget pattern. The -12px left
+   and right margins counteract the .postbox .inside padding (12px). */
+
+/* Drop the .postbox .inside top spacing so the gray header band sits
+   flush with the postbox header — only inside our widget. */
+#ideas_inbox_widget .inside {
+	margin-top: 0;
+	padding-top: 0;
+}
 
 .ideas-inbox__form {
 	background: var( --wpds-color-bg-surface-neutral-weak, #f6f7f7 );
-	border: 1px solid var( --wpds-color-stroke-surface-neutral-weak, #dcdcde );
-	border-radius: var( --wpds-border-radius-md, 4px );
+	border: none;
+	border-bottom: 1px solid var( --wpds-color-stroke-surface-neutral-weak, #dcdcde );
+	border-radius: 0;
 	padding: var( --wpds-dimension-padding-md, 12px );
-	margin: 0 0 var( --wpds-dimension-gap-md, 16px );
+	margin: 0 -12px var( --wpds-dimension-gap-md, 16px );
 }
 
 .ideas-inbox__textarea {
 	width: 100%;
 	box-sizing: border-box;
 	margin: 0;
-	padding: var( --wpds-dimension-padding-sm, 8px );
+	padding: var( --wpds-dimension-padding-md, 12px );
 	font: inherit;
+	font-size: var( --wpds-typography-font-size-md, 13px );
+	line-height: 1.7;
 	color: inherit;
-	background: var( --wpds-color-bg-surface-neutral, #fff );
-	border: 1px solid var( --wpds-color-stroke-interactive-neutral, #8c8f94 );
-	border-radius: var( --wpds-border-radius-sm, 2px );
-	resize: vertical;
-	min-height: 3.5em;
+	background: transparent;
+	border: none;
+	border-radius: 0;
+	resize: none;
+	min-height: 12em;
+	outline: none;
+	box-shadow: none;
 }
 
 .ideas-inbox__textarea:focus {
 	outline: none;
-	border-color: var( --wpds-color-stroke-focus-brand, var( --wp-admin-theme-color, #3858e9 ) );
-	box-shadow: 0 0 0 var( --wpds-border-width-focus, 2px ) var( --wpds-color-stroke-focus-brand, var( --wp-admin-theme-color, #3858e9 ) );
+	box-shadow: none;
 }
 
 .ideas-inbox__form-actions {
 	display: flex;
 	justify-content: flex-end;
-	margin: var( --wpds-dimension-gap-sm, 8px ) 0 0;
+	margin: var( --wpds-dimension-gap-md, 16px ) 0 0;
+	padding: 0 10px 10px 0;
 }
 
 /* List + rows */
@@ -81,7 +96,6 @@
 	align-items: baseline;
 	gap: var( --wpds-dimension-gap-sm, 8px );
 	padding: var( --wpds-dimension-padding-sm, 8px ) var( --wpds-dimension-padding-xs, 4px );
-	border-top: 1px solid var( --wpds-color-stroke-surface-neutral-weak, #dcdcde );
 	border-radius: var( --wpds-border-radius-sm, 2px );
 }
 
@@ -152,8 +166,8 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 28px;
-	height: 28px;
+	width: 26px;
+	height: 26px;
 	padding: 0;
 	background: transparent;
 	border: 1px solid transparent;

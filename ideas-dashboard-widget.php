@@ -130,8 +130,8 @@ function ideas_inbox_render_widget() {
 				id="ideas-inbox-idea"
 				class="ideas-inbox__textarea"
 				name="idea"
-				rows="2"
-				placeholder="<?php esc_attr_e( 'Drop an idea for future you…', 'ideas-dashboard-widget' ); ?>"
+				rows="7"
+				placeholder="<?php esc_attr_e( 'Jot it down…', 'ideas-dashboard-widget' ); ?>"
 				required
 			></textarea>
 			<p class="ideas-inbox__form-actions">
