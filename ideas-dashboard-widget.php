@@ -58,6 +58,40 @@ function ideas_inbox_enqueue_assets( $hook ) {
 		'before'
 	);
 	wp_set_script_translations( 'ideas-inbox', 'ideas-dashboard-widget' );
+
+	// Block editor experiment — only on the dashboard, where the widget lives.
+	if ( 'index.php' === $hook ) {
+		ideas_inbox_enqueue_block_editor();
+	}
+}
+
+function ideas_inbox_enqueue_block_editor() {
+	$asset_file = __DIR__ . '/assets/build/widget-editor.asset.php';
+	if ( ! file_exists( $asset_file ) ) {
+		return;
+	}
+	$asset = include $asset_file;
+
+	wp_enqueue_style(
+		'ideas-inbox-editor',
+		plugins_url( 'assets/build/widget-editor.css', __FILE__ ),
+		array( 'wp-components' ),
+		$asset['version']
+	);
+	wp_enqueue_style(
+		'ideas-inbox-editor-style',
+		plugins_url( 'assets/build/style-widget-editor.css', __FILE__ ),
+		array(),
+		$asset['version']
+	);
+	wp_enqueue_script(
+		'ideas-inbox-editor',
+		plugins_url( 'assets/build/widget-editor.js', __FILE__ ),
+		$asset['dependencies'],
+		$asset['version'],
+		true
+	);
+	wp_set_script_translations( 'ideas-inbox-editor', 'ideas-dashboard-widget' );
 }
 
 function ideas_inbox_register_widget() {
@@ -126,6 +160,7 @@ function ideas_inbox_render_widget() {
 			<label class="screen-reader-text" for="ideas-inbox-idea">
 				<?php esc_html_e( 'New idea', 'ideas-dashboard-widget' ); ?>
 			</label>
+			<div class="ideas-inbox__editor-mount" aria-hidden="true"></div>
 			<textarea
 				id="ideas-inbox-idea"
 				class="ideas-inbox__textarea"
@@ -250,11 +285,21 @@ function ideas_inbox_render_list( array $ideas ) {
 	<?php
 }
 
+function ideas_inbox_render_idea_text( $text ) {
+	$text = (string) $text;
+	// Block markup (from the isolated editor) — run through do_blocks then kses.
+	if ( has_blocks( $text ) ) {
+		return wp_kses_post( do_blocks( $text ) );
+	}
+	// Existing plain-text ideas: preserve newlines, escape everything else.
+	return nl2br( esc_html( $text ) );
+}
+
 function ideas_inbox_render_row( array $idea, $index = 0, $include_confirm_fallback = true ) {
 	$id = isset( $idea['id'] ) ? $idea['id'] : '';
 	?>
 	<li class="ideas-inbox__row" data-id="<?php echo esc_attr( $id ); ?>">
-		<div class="ideas-inbox__row-text"><?php echo esc_html( $idea['text'] ); ?></div>
+		<div class="ideas-inbox__row-text"><?php echo ideas_inbox_render_idea_text( $idea['text'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></div>
 		<div class="ideas-inbox__row-meta">
 			<span class="ideas-inbox__row-time">
 				<?php
@@ -314,10 +359,10 @@ function ideas_inbox_redirect_back() {
 function ideas_inbox_handle_add() {
 	ideas_inbox_verify_request();
 
-	$raw = isset( $_POST['idea'] ) ? wp_unslash( $_POST['idea'] ) : '';
-	$text = sanitize_textarea_field( $raw );
+	$raw  = isset( $_POST['idea'] ) ? wp_unslash( $_POST['idea'] ) : '';
+	$text = wp_kses_post( $raw );
 
-	if ( '' !== trim( $text ) ) {
+	if ( '' !== trim( wp_strip_all_tags( $text ) ) ) {
 		$ideas   = ideas_inbox_get_ideas();
 		$ideas[] = array(
 			'id'   => wp_generate_uuid4(),
@@ -346,7 +391,7 @@ function ideas_inbox_register_rest_routes() {
 				'text' => array(
 					'required'          => true,
 					'type'              => 'string',
-					'sanitize_callback' => 'sanitize_textarea_field',
+					'sanitize_callback' => 'wp_kses_post',
 				),
 			),
 		)
@@ -364,9 +409,9 @@ function ideas_inbox_register_rest_routes() {
 }
 
 function ideas_inbox_rest_add( WP_REST_Request $request ) {
-	// $request['text'] is already sanitized + trimmed by sanitize_textarea_field.
+	// $request['text'] is already sanitized via wp_kses_post.
 	$text = (string) $request['text'];
-	if ( '' === $text ) {
+	if ( '' === trim( wp_strip_all_tags( $text ) ) ) {
 		return new WP_Error(
 			'ideas_inbox_empty',
 			__( 'Idea cannot be empty.', 'ideas-dashboard-widget' ),
@@ -462,11 +507,16 @@ function ideas_inbox_handle_draft() {
 		ideas_inbox_redirect_back();
 	}
 
-	$idea    = $ideas[ $index ];
-	$post_id = wp_insert_post(
+	$idea          = $ideas[ $index ];
+	$has_blocks    = has_blocks( $idea['text'] );
+	$title_source  = $has_blocks ? wp_strip_all_tags( $idea['text'] ) : $idea['text'];
+	$post_content  = $has_blocks
+		? $idea['text']
+		: "<!-- wp:paragraph -->\n<p>" . str_replace( "\n", '<br>', esc_html( $idea['text'] ) ) . "</p>\n<!-- /wp:paragraph -->";
+	$post_id       = wp_insert_post(
 		array(
-			'post_title'   => wp_trim_words( $idea['text'], 10, '…' ),
-			'post_content' => "<!-- wp:paragraph -->\n<p>" . str_replace( "\n", '<br>', esc_html( $idea['text'] ) ) . "</p>\n<!-- /wp:paragraph -->",
+			'post_title'   => wp_trim_words( $title_source, 10, '…' ),
+			'post_content' => $post_content,
 			'post_status'  => 'draft',
 			'post_author'  => get_current_user_id(),
 		),

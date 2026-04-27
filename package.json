@@ -1,0 +1,16 @@
+{
+  "name": "ideas-dashboard-widget",
+  "version": "0.4.0",
+  "private": true,
+  "scripts": {
+    "build": "wp-scripts build src/widget-editor.js --output-path=assets/build",
+    "start": "wp-scripts start src/widget-editor.js --output-path=assets/build"
+  },
+  "devDependencies": {
+    "@wordpress/scripts": "^30.0.0",
+    "ajv": "^8.20.0"
+  },
+  "dependencies": {
+    "@automattic/isolated-block-editor": "^2.30.0"
+  }
+}

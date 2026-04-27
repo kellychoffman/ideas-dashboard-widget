@@ -236,3 +236,18 @@
 .ideas-inbox__notice p {
 	margin: 0.5em 0;
 }
+
+/* Block editor experiment — mount slot in the widget add area. */
+.ideas-inbox__editor-mount:empty {
+	display: none;
+}
+.ideas-inbox__editor-mount[data-mounted="1"] {
+	background: var( --wpds-color-bg-surface-neutral, #fff );
+	border: 1px solid var( --wpds-color-stroke-surface-neutral-weak, #dcdcde );
+	border-radius: 2px;
+	min-height: 120px;
+	margin-bottom: var( --wpds-dimension-gap-sm, 8px );
+}
+.ideas-inbox__editor-mount[data-mounted="1"] + .ideas-inbox__textarea {
+	display: none;
+}
