@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ideas Inbox
  * Description: An ideas inbox for your WP dashboard. Drop ideas for your future self to blog about.
- * Version:     0.4.0
+ * Version:     0.5.0
  * Author:      Kelly Hoffman
  * License:     GPL-2.0-or-later
  * Text Domain: ideas-dashboard-widget
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const IDEAS_INBOX_VERSION   = '0.4.0';
+const IDEAS_INBOX_VERSION   = '0.5.0';
 const IDEAS_INBOX_META_KEY  = 'ideas_inbox';
 const IDEAS_INBOX_NONCE     = 'ideas_inbox';
 const IDEAS_INBOX_PAGE_SLUG = 'ideas-inbox';
@@ -254,7 +254,11 @@ function ideas_inbox_render_row( array $idea, $index = 0, $include_confirm_fallb
 	$id = isset( $idea['id'] ) ? $idea['id'] : '';
 	?>
 	<li class="ideas-inbox__row" data-id="<?php echo esc_attr( $id ); ?>">
-		<div class="ideas-inbox__row-text"><?php echo esc_html( $idea['text'] ); ?></div>
+		<button
+			type="button"
+			class="ideas-inbox__row-text"
+			aria-label="<?php esc_attr_e( 'Edit idea', 'ideas-dashboard-widget' ); ?>"
+		><?php echo esc_html( $idea['text'] ); ?></button>
 		<div class="ideas-inbox__row-meta">
 			<span class="ideas-inbox__row-time">
 				<?php
@@ -356,9 +360,23 @@ function ideas_inbox_register_rest_routes() {
 		'ideas-inbox/v1',
 		'/ideas/(?P<id>[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})',
 		array(
-			'methods'             => WP_REST_Server::DELETABLE,
-			'callback'            => 'ideas_inbox_rest_delete',
-			'permission_callback' => $permission,
+			array(
+				'methods'             => WP_REST_Server::DELETABLE,
+				'callback'            => 'ideas_inbox_rest_delete',
+				'permission_callback' => $permission,
+			),
+			array(
+				'methods'             => 'PATCH',
+				'callback'            => 'ideas_inbox_rest_update',
+				'permission_callback' => $permission,
+				'args'                => array(
+					'text' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_textarea_field',
+					),
+				),
+			),
 		)
 	);
 }
@@ -396,6 +414,42 @@ function ideas_inbox_rest_add( WP_REST_Request $request ) {
 			'id'    => $idea['id'],
 			'html'  => $html,
 			'total' => count( $ideas ),
+		)
+	);
+}
+
+function ideas_inbox_rest_update( WP_REST_Request $request ) {
+	$text = (string) $request['text'];
+	if ( '' === $text ) {
+		return new WP_Error(
+			'ideas_inbox_empty',
+			__( 'Idea cannot be empty.', 'ideas-dashboard-widget' ),
+			array( 'status' => 400 )
+		);
+	}
+
+	$ideas = ideas_inbox_get_ideas();
+	$index = ideas_inbox_find_index_by_id( $ideas, $request['id'] );
+
+	if ( false === $index ) {
+		return new WP_Error(
+			'ideas_inbox_not_found',
+			__( 'Idea not found.', 'ideas-dashboard-widget' ),
+			array( 'status' => 404 )
+		);
+	}
+
+	$ideas[ $index ]['text'] = $text;
+	ideas_inbox_save_ideas( $ideas );
+
+	ob_start();
+	ideas_inbox_render_row( $ideas[ $index ], $index, false );
+	$html = ob_get_clean();
+
+	return rest_ensure_response(
+		array(
+			'id'   => $ideas[ $index ]['id'],
+			'html' => $html,
 		)
 	);
 }
