@@ -347,7 +347,7 @@
 		cancelBtn.type = 'button';
 		cancelBtn.className = 'button ideas-inbox__cancel';
 		cancelBtn.textContent = __( 'Cancel', 'ideas-dashboard-widget' );
-		cancelBtn.hidden = true;
+		cancelBtn.style.display = 'none';
 		if ( actions ) {
 			actions.appendChild( cancelBtn );
 		}
@@ -366,7 +366,7 @@
 			if ( submit ) {
 				submit.textContent = saveLabel;
 			}
-			cancelBtn.hidden = false;
+			cancelBtn.style.display = '';
 		}
 
 		function exitEdit() {
@@ -377,7 +377,7 @@
 			if ( submit ) {
 				submit.textContent = addLabel;
 			}
-			cancelBtn.hidden = true;
+			cancelBtn.style.display = 'none';
 		}
 
 		function hasUnsavedChanges() {
