@@ -28,23 +28,55 @@
 	var _n            = wp.i18n._n;
 	var apiFetch      = wp.apiFetch;
 
-	// The delete dialog depends on Components; the add flow does not.
-	// Guard them independently so the add-form enhancement still
-	// activates even if __experimentalConfirmDialog is renamed or removed.
-	var ConfirmDialog   = wp.components && wp.components.__experimentalConfirmDialog;
-	var hasDeleteDialog = !! ( ConfirmDialog && createRoot );
+	// The shared confirm modal depends on Components; the add/edit flow
+	// degrades gracefully without it. Guard them independently so the
+	// add-form enhancement still activates even if __experimentalConfirmDialog
+	// is renamed or removed.
+	var ConfirmDialog = wp.components && wp.components.__experimentalConfirmDialog;
+	var hasModal      = !! ( ConfirmDialog && createRoot );
 
-	var DIALOG_EVENT = 'ideas-inbox:confirm-delete';
+	function confirmAction( opts ) {
+		if ( hasModal ) {
+			return confirmWith( opts );
+		}
+		return Promise.resolve( window.confirm( opts.message ) );
+	}
+
+	var DIALOG_EVENT = 'ideas-inbox:confirm';
 	var REST_BASE    = '/ideas-inbox/v1/ideas';
 
-	function DeleteConfirm() {
+	// Promise-based wrapper around the ConfirmDialog portal. Lets both the
+	// delete flow and the discard-edit flow use the same modal UI.
+	function confirmWith( opts ) {
+		return new Promise( function ( resolve ) {
+			document.dispatchEvent(
+				new CustomEvent( DIALOG_EVENT, {
+					detail: {
+						message: opts.message,
+						confirmText: opts.confirmText,
+						cancelText: opts.cancelText,
+						resolve: resolve,
+					},
+				} )
+			);
+		} );
+	}
+
+	function ConfirmManager() {
 		var state      = useState( null );
 		var pending    = state[ 0 ];
 		var setPending = state[ 1 ];
 
 		useEffect( function () {
 			function onRequest( event ) {
-				setPending( event.detail );
+				// If a previous prompt is still pending (shouldn't normally
+				// happen), resolve it as cancelled before swapping in the new one.
+				setPending( function ( prev ) {
+					if ( prev && prev.resolve ) {
+						prev.resolve( false );
+					}
+					return event.detail;
+				} );
 			}
 			document.addEventListener( DIALOG_EVENT, onRequest );
 			return function () {
@@ -52,31 +84,25 @@
 			};
 		}, [] );
 
-		var close = useCallback( function () {
-			setPending( null );
+		var settle = useCallback( function ( value ) {
+			setPending( function ( prev ) {
+				if ( prev && prev.resolve ) {
+					prev.resolve( value );
+				}
+				return null;
+			} );
 		}, [] );
 
 		return createElement(
 			ConfirmDialog,
 			{
 				isOpen: pending !== null,
-				confirmButtonText: __( 'Delete', 'ideas-dashboard-widget' ),
-				cancelButtonText: __( 'Never mind', 'ideas-dashboard-widget' ),
-				onConfirm: function () {
-					var current = pending;
-					setPending( null );
-					if ( ! current ) {
-						return;
-					}
-					if ( current.id && apiFetch ) {
-						deleteIdea( current );
-					} else if ( current.url ) {
-						window.location.href = current.url;
-					}
-				},
-				onCancel: close,
+				confirmButtonText: pending ? pending.confirmText : '',
+				cancelButtonText: pending ? pending.cancelText : '',
+				onConfirm: function () { settle( true ); },
+				onCancel: function () { settle( false ); },
 			},
-			__( "Just double checking you want to delete this idea. It can't be undone.", 'ideas-dashboard-widget' )
+			pending ? pending.message : ''
 		);
 	}
 
@@ -413,19 +439,27 @@
 				return;
 			}
 
+			// The button contains only the raw idea text rendered via esc_html;
+			// textContent decodes entities back to the original characters.
+			var nextText = btn.textContent;
+
 			if ( hasUnsavedChanges() ) {
-				var proceed = window.confirm(
-					__( 'Discard your unsaved idea?', 'ideas-dashboard-widget' )
-				);
-				if ( ! proceed ) {
-					return;
-				}
+				confirmAction( {
+					message: __( 'Discard your unsaved idea?', 'ideas-dashboard-widget' ),
+					confirmText: __( 'Discard', 'ideas-dashboard-widget' ),
+					cancelText: __( 'Keep editing', 'ideas-dashboard-widget' ),
+				} ).then( function ( ok ) {
+					if ( ! ok ) {
+						return;
+					}
+					clearError( container );
+					enterEdit( id, nextText );
+				} );
+				return;
 			}
 
 			clearError( container );
-			// The button contains only the raw idea text rendered via esc_html;
-			// textContent decodes entities back to the original characters.
-			enterEdit( id, btn.textContent );
+			enterEdit( id, nextText );
 		} );
 
 		form.addEventListener( 'submit', function ( event ) {
@@ -469,13 +503,13 @@
 	}
 
 	function init() {
-		if ( hasDeleteDialog ) {
+		if ( hasModal ) {
 			// Mount the dialog portal outside the dashboard widget so it
 			// isn't clipped by postbox overflow rules.
 			var dialogRoot = document.createElement( 'div' );
 			dialogRoot.className = 'ideas-inbox-dialog-root';
 			document.body.appendChild( dialogRoot );
-			createRoot( dialogRoot ).render( createElement( DeleteConfirm ) );
+			createRoot( dialogRoot ).render( createElement( ConfirmManager ) );
 
 			// Strip the native confirm() fallback now that the component
 			// dialog is ready. Links without JS keep the inline handler.
@@ -492,11 +526,20 @@
 				event.preventDefault();
 				var row = link.closest( '.ideas-inbox__row' );
 				var id  = row ? row.getAttribute( 'data-id' ) : '';
-				document.dispatchEvent(
-					new CustomEvent( DIALOG_EVENT, {
-						detail: { url: link.href, id: id, row: row },
-					} )
-				);
+				confirmAction( {
+					message: __( "Just double checking you want to delete this idea. It can't be undone.", 'ideas-dashboard-widget' ),
+					confirmText: __( 'Delete', 'ideas-dashboard-widget' ),
+					cancelText: __( 'Never mind', 'ideas-dashboard-widget' ),
+				} ).then( function ( ok ) {
+					if ( ! ok ) {
+						return;
+					}
+					if ( id && apiFetch ) {
+						deleteIdea( { id: id, row: row, url: link.href } );
+					} else if ( link.href ) {
+						window.location.href = link.href;
+					}
+				} );
 			} );
 		}
 
