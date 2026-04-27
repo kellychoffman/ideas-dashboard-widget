@@ -44,6 +44,10 @@ This plugin is deliberately small:
 
 ## Changelog
 
+### 0.5.0
+
+- Click an idea's text in the dashboard widget to load it back into the textarea for editing. The submit button switches to **Save**, and a **Cancel** button returns the form to a fresh entry. Editing preserves the idea's original timestamp. Adds `PATCH /ideas-inbox/v1/ideas/{id}` for the update.
+
 ### 0.4.0
 
 - Add and delete ideas without a full page reload. Uses a `ideas-inbox/v1` REST namespace with `wp.apiFetch`; the existing `admin-post.php` handlers stay as the no-JS fallback.

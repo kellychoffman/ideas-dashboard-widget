@@ -307,6 +307,25 @@
 		}
 	}
 
+	function onUpdateSuccess( container, id, res ) {
+		clearError( container );
+		if ( ! res || ! res.html ) {
+			return;
+		}
+		var row = container.querySelector(
+			'.ideas-inbox__row[data-id="' + id + '"]'
+		);
+		if ( ! row ) {
+			return;
+		}
+		var template = document.createElement( 'template' );
+		template.innerHTML = res.html.trim();
+		var newRow = template.content.firstElementChild;
+		if ( newRow ) {
+			row.replaceWith( newRow );
+		}
+	}
+
 	function bindAddForm( container ) {
 		if ( ! apiFetch ) {
 			return;
@@ -315,16 +334,125 @@
 		if ( ! form ) {
 			return;
 		}
+
+		var textarea  = form.querySelector( '.ideas-inbox__textarea' );
+		var submit    = form.querySelector( 'button[type="submit"]' );
+		var actions   = form.querySelector( '.ideas-inbox__form-actions' );
+		var addLabel  = submit ? submit.textContent : __( 'Add idea', 'ideas-dashboard-widget' );
+		var saveLabel = __( 'Save', 'ideas-dashboard-widget' );
+
+		// Inject a Cancel button alongside Save/Add. JS-only — no-JS users
+		// don't need a way to cancel because they can't enter edit mode.
+		var cancelBtn = document.createElement( 'button' );
+		cancelBtn.type = 'button';
+		cancelBtn.className = 'button ideas-inbox__cancel';
+		cancelBtn.textContent = __( 'Cancel', 'ideas-dashboard-widget' );
+		cancelBtn.hidden = true;
+		if ( actions ) {
+			actions.appendChild( cancelBtn );
+		}
+
+		var editing = null; // { id, originalText } when editing.
+
+		function enterEdit( id, text ) {
+			editing = { id: id, originalText: text };
+			if ( textarea ) {
+				textarea.value = text;
+				textarea.focus();
+				try {
+					textarea.setSelectionRange( text.length, text.length );
+				} catch ( e ) {}
+			}
+			if ( submit ) {
+				submit.textContent = saveLabel;
+			}
+			cancelBtn.hidden = false;
+		}
+
+		function exitEdit() {
+			editing = null;
+			if ( textarea ) {
+				textarea.value = '';
+			}
+			if ( submit ) {
+				submit.textContent = addLabel;
+			}
+			cancelBtn.hidden = true;
+		}
+
+		function hasUnsavedChanges() {
+			if ( ! textarea ) {
+				return false;
+			}
+			var current = textarea.value;
+			if ( editing ) {
+				return current !== editing.originalText;
+			}
+			return current.trim() !== '';
+		}
+
+		cancelBtn.addEventListener( 'click', function () {
+			clearError( container );
+			exitEdit();
+		} );
+
+		// Click on an idea's text button → load it into the textarea for editing.
+		container.addEventListener( 'click', function ( event ) {
+			var btn = event.target.closest( '.ideas-inbox__row-text' );
+			if ( ! btn || ! container.contains( btn ) ) {
+				return;
+			}
+			var row = btn.closest( '.ideas-inbox__row' );
+			var id  = row ? row.getAttribute( 'data-id' ) : '';
+			if ( ! id ) {
+				return;
+			}
+
+			if ( editing && editing.id === id ) {
+				if ( textarea ) textarea.focus();
+				return;
+			}
+
+			if ( hasUnsavedChanges() ) {
+				var proceed = window.confirm(
+					__( 'Discard your unsaved idea?', 'ideas-dashboard-widget' )
+				);
+				if ( ! proceed ) {
+					return;
+				}
+			}
+
+			clearError( container );
+			// The button contains only the raw idea text rendered via esc_html;
+			// textContent decodes entities back to the original characters.
+			enterEdit( id, btn.textContent );
+		} );
+
 		form.addEventListener( 'submit', function ( event ) {
-			var textarea = form.querySelector( '.ideas-inbox__textarea' );
-			var text     = textarea ? textarea.value.trim() : '';
+			var text = textarea ? textarea.value.trim() : '';
 			if ( ! text ) {
 				return;
 			}
 			event.preventDefault();
 
-			var submit = form.querySelector( 'button[type="submit"]' );
 			if ( submit ) submit.disabled = true;
+
+			if ( editing ) {
+				var editingId = editing.id;
+				apiFetch( {
+					path: REST_BASE + '/' + editingId,
+					method: 'PATCH',
+					data: { text: text },
+				} ).then( function ( res ) {
+					onUpdateSuccess( container, editingId, res );
+					exitEdit();
+				} ).catch( function ( err ) {
+					showError( container, extractErrorMessage( err ) );
+				} ).finally( function () {
+					if ( submit ) submit.disabled = false;
+				} );
+				return;
+			}
 
 			apiFetch( {
 				path: REST_BASE,

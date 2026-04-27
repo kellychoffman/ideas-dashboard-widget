@@ -58,6 +58,7 @@
 .ideas-inbox__form-actions {
 	display: flex;
 	justify-content: flex-end;
+	gap: var( --wpds-dimension-gap-sm, 8px );
 	margin: var( --wpds-dimension-gap-md, 16px ) 0 0;
 	padding: 0 10px 10px 0;
 }
@@ -106,6 +107,27 @@
 	word-break: break-word;
 	font-size: var( --wpds-typography-font-size-md, 13px );
 	line-height: var( --wpds-typography-line-height-md, 1.5 );
+	/* Reset native button styles since the row text is rendered as a <button>
+	   so it's keyboard-activatable for click-to-edit. */
+	background: transparent;
+	border: 0;
+	padding: 0;
+	margin: 0;
+	color: inherit;
+	font-family: inherit;
+	text-align: left;
+	cursor: pointer;
+	appearance: none;
+}
+
+.ideas-inbox__row-text:hover {
+	color: var( --wpds-color-fg-content-link, #2271b1 );
+}
+
+.ideas-inbox__row-text:focus-visible {
+	outline: 2px solid var( --wpds-color-stroke-focus, #2271b1 );
+	outline-offset: 2px;
+	border-radius: var( --wpds-border-radius-sm, 2px );
 }
 
 .ideas-inbox__row-meta {
